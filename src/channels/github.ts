@@ -19,6 +19,10 @@ import {
 	credentialsFromWorkerEnv,
 	requiredProcessEnv,
 } from '../github/client.ts';
+import {
+	type IngressWorkflowParams,
+	ingressCoordinatorKey,
+} from '../ingress/contracts.ts';
 import { resolvePersona } from '../personas/personas.ts';
 import {
 	RELEASE_SECURITY_TARGET,
@@ -73,6 +77,27 @@ export const githubChannel = createGitHubChannel<AppHonoEnv>({
 				);
 				const admission = await coordinator.enqueue(dispatch.params);
 				logAdmitted(delivery, 'triage', admission.disposition);
+				// A new or reopened issue also enters ingress classification. The
+				// two capabilities are independent — each checks its own
+				// configuration when its workflow runs.
+				const action = dispatch.params.issueAction;
+				if (action === 'opened' || action === 'reopened') {
+					const ingressParams: IngressWorkflowParams = {
+						deliveryId: dispatch.params.deliveryId,
+						installationId: dispatch.params.installationId,
+						repositoryId: dispatch.params.repositoryId,
+						owner: dispatch.params.owner,
+						repo: dispatch.params.repo,
+						issueNumber: dispatch.params.issueNumber,
+						defaultBranch: dispatch.params.defaultBranch,
+						issueAction: action,
+					};
+					const ingress = c.env.INGRESS_COORDINATOR.getByName(
+						ingressCoordinatorKey(ingressParams),
+					);
+					const ingressAdmission = await ingress.enqueue(ingressParams);
+					logAdmitted(delivery, 'ingress', ingressAdmission.disposition);
+				}
 				return Response.json({
 					accepted: true,
 					capability: 'triage',
@@ -537,6 +562,7 @@ function logAdmitted(
 	capability:
 		| 'review'
 		| 'triage'
+		| 'ingress'
 		| 'advisory'
 		| 'release-security'
 		| 'adversary'
