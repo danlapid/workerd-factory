@@ -34,6 +34,7 @@ GitHub webhooks ─→ Hono ingress (signature verification)
                         ├→ ReviewCoordinator DO (one per PR)  ─→ ReviewWorkflow ─→ PullRequestReviewer agent
                         ├→ AdversaryCoordinator DO (one per PR) ─→ AdversaryWorkflow ─→ BlueTeam / PurpleTeam agents
                         ├→ TriageCoordinator DO (one per issue) ─→ TriageWorkflow ─→ FixVerifier / RetriageJudge agents
+                        ├→ IngressCoordinator DO (one per issue) ─→ IngressWorkflow ─→ IssueClassifier agent
                         ├→ AuthorCoordinator DO (one per PR) ─→ AuthorWorkflow ─→ CodeAuthor agent (one conversation per PR)
                         ├→ AdvisoryCoordinator DO (one per advisory) ─→ AdvisoryWorkflow ─→ AdvisoryTriager agent ─→ Discord
                         └→ ReleaseSecurityCoordinator DO (one per PR) ─→ ReleaseSecurityWorkflow ─→ ReleaseSecurityReviewer agent
@@ -41,7 +42,9 @@ GitHub webhooks ─→ Hono ingress (signature verification)
 
 - **Router** (`src/router.ts`): deterministic and pure. `pull_request.labeled`
   → review; `issues.opened|reopened|closed` and human `issue_comment.created`
-  → triage; `issues.assigned`, `pull_request.assigned`, and
+  → triage (opened/reopened issues also enter
+  [ingress classification](#ingress-classification-srcingress));
+  `issues.assigned`, `pull_request.assigned`, and
   `pull_request.review_requested` → [personas](#personas);
   `repository_advisory.reported` → advisory triage; human reviews,
   review comments, comments, and failed checks on Factory pull requests → the
@@ -153,6 +156,42 @@ labels (visible, maintainer-overridable):
 
 Missing labels are created automatically with sensible colors, so installing
 on a fresh repository requires no setup.
+
+### Ingress classification (`src/ingress/`)
+
+A lightweight, classification-only alternative (or complement) to the full
+triage pipeline, for repositories where sandboxed reproduction isn't practical
+— a large C++ codebase, say. On `issues.opened` / `issues.reopened`, a no-tool
+classifier agent reads the issue text and classifies it on three axes:
+
+- **legitimacy** — genuine report vs. spam/slop ("real or fake"),
+- **kind** — bug report vs. question vs. feature request,
+- **reproduction** — for bug reports, whether the report carries enough to
+  attempt a reproduction.
+
+The workflow then applies the implied labels (additive only — it never removes
+a maintainer's labels) and, when a bug report lacks a reproduction, leaves one
+polite comment asking for a minimal repro (`commentOnMissingReproduction`,
+on by default). Fake-looking reports are labeled, never closed — closing is a
+maintainer's call. Issues that already carry one of the configured labels, are
+closed, or were opened by a bot are skipped.
+
+Off unless the repository opts in with an `ingress` section:
+
+```yaml
+version: 1
+triage:
+  enabled: false # classification only; no reproduce/fix pipeline
+ingress:
+  model: anthropic/claude-sonnet-4-5 # optional; defaults to the verification model
+  labels: # optional; defaults shown under src/ingress/labels.ts
+    fake: invalid
+    bug: bug
+    question: question
+    featureRequest: enhancement
+    hasReproduction: has repro
+    needsReproduction: needs repro
+```
 
 ### Code author (`src/author/`)
 

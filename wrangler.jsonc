@@ -65,6 +65,10 @@
 				"class_name": "AuthorCoordinator"
 			},
 			{
+				"name": "INGRESS_COORDINATOR",
+				"class_name": "IngressCoordinator"
+			},
+			{
 				"name": "RELEASE_SECURITY_COORDINATOR",
 				"class_name": "ReleaseSecurityCoordinator"
 			},
@@ -98,6 +102,11 @@
 			"name": "factory-author",
 			"binding": "AUTHOR_WORKFLOW",
 			"class_name": "AuthorWorkflow"
+		},
+		{
+			"name": "factory-ingress",
+			"binding": "INGRESS_WORKFLOW",
+			"class_name": "IngressWorkflow"
 		},
 		{
 			"name": "factory-release-security",
@@ -173,6 +182,10 @@
 				"DiscordGateway",
 				"DiscordThreadCoordinator"
 			]
+		},
+		{
+			"tag": "v9",
+			"new_sqlite_classes": ["FlueIssueClassifierAgent", "IngressCoordinator"]
 		}
 	]
 }
