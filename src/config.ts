@@ -15,6 +15,10 @@ import type { InstallationClient } from './github/client.ts';
 import { isGitHubStatus, readRepositoryFile } from './github/content.ts';
 import { validateSkillDirectory } from './github/skill.ts';
 import {
+	DEFAULT_INGRESS_LABELS,
+	type IngressLabelConfig,
+} from './ingress/labels.ts';
+import {
 	CODE_MODEL,
 	isSupportedModel,
 	MODEL_SPECIFIER_PROVIDERS,
@@ -267,6 +271,15 @@ const factoryConfigSchema = v.object({
 			areas: v.optional(classificationListSchema),
 		}),
 	),
+	ingress: v.optional(
+		v.object({
+			enabled: v.optional(v.boolean()),
+			model: v.optional(modelSchema),
+			thinkingLevel: v.optional(thinkingLevelSchema),
+			commentOnMissingReproduction: v.optional(v.boolean()),
+			labels: v.optional(v.partial(v.object(ingressLabelConfigShape()))),
+		}),
+	),
 	triage: v.optional(
 		v.object({
 			enabled: v.optional(v.boolean()),
@@ -334,6 +347,27 @@ function labelConfigShape() {
 	return Object.fromEntries(
 		Object.keys(DEFAULT_TRIAGE_LABELS).map((key) => [key, labelNameSchema]),
 	) as Record<keyof TriageLabelConfig, typeof labelNameSchema>;
+}
+
+function ingressLabelConfigShape() {
+	return Object.fromEntries(
+		Object.keys(DEFAULT_INGRESS_LABELS).map((key) => [key, labelNameSchema]),
+	) as Record<keyof IngressLabelConfig, typeof labelNameSchema>;
+}
+
+/**
+ * Ingress classification of newly opened issues: genuine vs. fake, bug report
+ * vs. question vs. feature request, and whether a bug report carries a
+ * reproduction. Off unless the repository configures an `ingress` section —
+ * it applies visible labels, so a repository has to opt in.
+ */
+export interface IngressConfig {
+	/** `<provider>/<model>`; a text-only classifier, so no coding model needed. */
+	model: string;
+	thinkingLevel: ThinkingLevel | undefined;
+	/** Ask the reporter for a reproduction when a bug report lacks one. */
+	commentOnMissingReproduction: boolean;
+	labels: IngressLabelConfig;
 }
 
 export interface ReviewConfig {
@@ -477,6 +511,7 @@ export interface FactoryConfig {
 	personas: PersonasConfig;
 	adversary: AdversaryConfig | undefined;
 	review: ReviewConfig | undefined;
+	ingress: IngressConfig | undefined;
 	triage: TriageConfig;
 	releaseSecurity: { thinkingLevel: ThinkingLevel };
 	advisories: AdvisoriesConfig;
@@ -488,6 +523,7 @@ export function defaultFactoryConfig(): FactoryConfig {
 		personas: parsePersonas(undefined, false),
 		adversary: undefined,
 		review: undefined,
+		ingress: undefined,
 		triage: {
 			enabled: true,
 			autoPrOnFix: false,
@@ -560,6 +596,16 @@ export function parseFactoryConfig(source: string): FactoryConfig {
 					areas: config.review.areas ?? [...DEFAULT_AREAS],
 				}
 			: undefined,
+		ingress:
+			config.ingress && (config.ingress.enabled ?? true)
+				? {
+						model: config.ingress.model ?? VERIFICATION_MODEL,
+						thinkingLevel: config.ingress.thinkingLevel,
+						commentOnMissingReproduction:
+							config.ingress.commentOnMissingReproduction ?? true,
+						labels: { ...DEFAULT_INGRESS_LABELS, ...config.ingress.labels },
+					}
+				: undefined,
 		triage: {
 			enabled: config.triage?.enabled ?? true,
 			autoPrOnFix: config.triage?.autoPrOnFix ?? false,

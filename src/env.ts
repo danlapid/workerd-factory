@@ -5,6 +5,8 @@ import type { AdvisoryWorkflowParams } from './advisory/contracts.ts';
 import type { AdvisoryCoordinator } from './advisory/coordinator.ts';
 import type { AuthorWorkflowParams } from './author/contracts.ts';
 import type { AuthorCoordinator } from './author/coordinator.ts';
+import type { IngressWorkflowParams } from './ingress/contracts.ts';
+import type { IngressCoordinator } from './ingress/coordinator.ts';
 import type { ReleaseSecurityWorkflowParams } from './release-security/contracts.ts';
 import type { ReleaseSecurityCoordinator } from './release-security/coordinator.ts';
 import type { ReviewWorkflowParams } from './review/contracts.ts';
@@ -27,6 +29,8 @@ export interface WorkerEnv
 	ADVERSARY_ARTIFACTS: R2Bucket;
 	AUTHOR_COORDINATOR: DurableObjectNamespace<AuthorCoordinator>;
 	AUTHOR_WORKFLOW: Workflow<AuthorWorkflowParams>;
+	INGRESS_COORDINATOR: DurableObjectNamespace<IngressCoordinator>;
+	INGRESS_WORKFLOW: Workflow<IngressWorkflowParams>;
 	REVIEW_COORDINATOR: DurableObjectNamespace<ReviewCoordinator>;
 	TRIAGE_COORDINATOR: DurableObjectNamespace<TriageCoordinator>;
 	TRIAGE_SANDBOX: DurableObjectNamespace<Sandbox>;
